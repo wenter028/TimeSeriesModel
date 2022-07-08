@@ -19,7 +19,7 @@ DATA_PATH = 'D:/Code/Work/GTJA/spread basis/wwt_data'
 ETF_PATH = DATA_PATH+'/'+'510300'
 FUTURE_PATH_NOW = DATA_PATH +'/'+'IF'
 FUTURE_PATH_NEXT = DATA_PATH+'/'+'IF_1'
-ss
+
 #the data used to train model
 ETF_DATA_PATH = 'D:/Code/Work/GTJA/spread basis/ETF'
 FUTURE_DATA_PATH = 'D:/Code/Work/GTJA/spread basis/major contract'

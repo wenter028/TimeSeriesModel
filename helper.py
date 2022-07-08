@@ -12,8 +12,6 @@ import mplfinance as mpf
 import numpy as np
 import warnings
 
-import statsmodels.api as sm
-sm.tsa.arima.ARIMA
 CORE_NUM = int(os.environ['NUMBER_OF_PROCESSORS'])
 
 PROJ_PATH = 'D:/Code/Work/GTJA/spread basis'

@@ -124,7 +124,7 @@ class basis_plot:
 
 
 # get data
-class GetData:
+class DataLoader:
     def __init__(self):
         self.data_etf = None
         self.data_future = None
@@ -135,19 +135,20 @@ class GetData:
         self.data_etf = load_gzip(ETF_DATA_PATH + '/' + date)
         self.data_future = load_gzip(FUTURE_DATA_PATH + '/' + date)
 
-        # etf data
-        self.data_etf.reset_index(inplace=True)
-        self.data_etf['Time'] = self.data_etf.time.apply(lambda x: time(x.hour, x.minute, x.second, 400000))
-        self.data_etf['wpr_price'] = ((
-                                                  self.data_etf.BidPrice1 * self.data_etf.AskVolume1 + self.data_etf.AskPrice1 * self.data_etf.BidVolume1) * 1000 / (
-                                                  self.data_etf.BidVolume1 + self.data_etf.AskVolume1)).round(2)
-
         # future data
         self.data_future = self.data_future[
             (self.data_future.Time >= time(9, 30, 0)) & (self.data_future.Time <= time(15, 0, 0))]
         self.data_future['wpr_price'] = ((
-                                                     self.data_future.bid_price1 * self.data_future.ask_vol1 + self.data_future.ask_price1 * self.data_future.bid_vol1) / (
+                                                 self.data_future.bid_price1 * self.data_future.ask_vol1 + self.data_future.ask_price1 * self.data_future.bid_vol1) / (
                                                  self.data_future.bid_vol1 + self.data_future.ask_vol1)).round(2)
+
+        future_microsecond = self.data_future.iloc[0].Time.microsecond
+        # etf data
+        self.data_etf.reset_index(inplace=True)
+        self.data_etf['Time'] = self.data_etf.time.apply(lambda x: time(x.hour, x.minute, x.second, future_microsecond))
+        self.data_etf['wpr_price'] = ((
+                                                  self.data_etf.BidPrice1 * self.data_etf.AskVolume1 + self.data_etf.AskPrice1 * self.data_etf.BidVolume1) * 1000 / (
+                                                  self.data_etf.BidVolume1 + self.data_etf.AskVolume1)).round(2)
 
     def get_second_data(self, date,second_type='half'):
         try:
@@ -173,7 +174,7 @@ class GetData:
         try:
             data = data.sort_values(by='Time').set_index('Time').fillna(method='ffill').dropna()
         except NameError as e:
-            print('second_type error',e)
+            print('SECOND_TYPE error',e)
 
         data['basis'] = data.wpr_price_future - data.wpr_price_etf
         data = data.drop(data[(data.index>time(11,30,0))&(data.index<time(13,0,0))].index)

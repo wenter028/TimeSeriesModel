@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import mplfinance as mpf
 import numpy as np
 import warnings
-
+import itertools
 
 warnings.filterwarnings("ignore")
 

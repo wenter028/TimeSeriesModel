@@ -27,6 +27,7 @@ FUTURE_PATH_NEXT = DATA_PATH+'/'+'IF_1'
 ETF_DATA_PATH = 'D:/Code/Work/GTJA/spread basis/ETF'
 FUTURE_DATA_PATH = 'D:/Code/Work/GTJA/spread basis/major contract'
 
+ALL_DATES = os.listdir(ETF_DATA_PATH)
 
 #parell
 def parLapply(iterable, func, *args, **kwargs):

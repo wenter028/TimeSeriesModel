@@ -2,7 +2,7 @@ from helper import *
 import statsmodels.tsa.stattools as ts
 from statsmodels.stats.diagnostic import acorr_ljungbox
 import statsmodels.api as sm
-from statsmodels.graphics.api import qqplot
+
 from arch import arch_model
 
 ##get the data processing from original data
@@ -60,7 +60,7 @@ class DataProcessing:
         return train_data, test_data
 
 
-##ARIMA
+##ARIMA and GARCH
 class Basic_TS:
     def __init__(self, train_data, test_data):
         self.train_data = train_data
@@ -80,7 +80,7 @@ class Basic_TS:
 
     @staticmethod
     def _white_noise(data):
-        if acorr_ljungbox(data, lags=1).values[0][1] >= 0.05:
+        if acorr_ljungbox(data, lags=[10]).values[0][1] >= 0.05:
             print('data WN')
             return True
 
@@ -91,7 +91,7 @@ class Basic_TS:
     def _plot_acf(data):
         sm.graphics.tsa.plot_acf(data, lags=20)
 
-    def _select_best_model(self, max_ar=4, max_ma=4):
+    def _select_best_model(self, max_ar, max_ma):
         if self._get_stationary(self.train_data):
             if not self._white_noise(self.train_data):
                 p, q = sm.tsa.arma_order_select_ic(self.train_data, max_ar=max_ar, max_ma=max_ma, ic='bic')[
@@ -99,9 +99,9 @@ class Basic_TS:
                 return p, q
         return 0
 
-    def arima_fit(self):
+    def arima_fit(self, max_ar=4, max_ma=4):
         try:
-            p, q = self._select_best_model()
+            p, q = self._select_best_model(max_ar, max_ma)
 
         except TypeError as e:
             print('p,q not define')
@@ -109,7 +109,7 @@ class Basic_TS:
         self.arima_model = sm.tsa.arima.ARIMA(self.train_data, order=(p, 0, q)).fit()
 
         print('arima fit done')
-        print(self.arima_model)
+        print(self.arima_model.summary())
 
     def arima_test(self):
         resid = self.arima_model.resid
@@ -122,10 +122,11 @@ class Basic_TS:
         else:
             print('arima fit mean bad')
 
-        qqplot(resid, line='q', fit=True)
+
+        sm.qqplot(resid, line='q', fit=True)
         # self._plot_acf(resid)
         # self._plot_acf(abs(resid))
-
+        self.arima_model.plot_diagnostics(figsize=(15, 10))
         plt.show()
 
     def garch_fit(self, pv=1, qv=1):
@@ -145,24 +146,37 @@ class Basic_TS:
         resid = self.garch_model.resid
 
         self._white_noise(resid)
-        qqplot(resid, line='q', fit=True)
+
+        garch_std_resid = pd.Series(self.garch_model.resid / self.garch_model.conditional_volatility)
+        fig = plt.figure(figsize=(15, 8))
+
+        # Residual
+        garch_std_resid.plot(ax=fig.add_subplot(3, 1, 1), title='GARCH Standardized-Residual', legend=False)
+
+        # ACF/PACF
+        self._plot_acf(garch_std_resid)
+
+        # QQ-Plot & Norm-Dist
+        sm.qqplot(garch_std_resid, line='s', ax=fig.add_subplot(3, 2, 5))
+        plt.title("QQ Plot")
+        fig.add_subplot(3, 2, 6).hist(garch_std_resid, bins=40)
+        plt.title("Histogram")
+
+        plt.tight_layout()
         plt.show()
 
 
+if __name__ == '__main__':
+    dp = DataProcessing(ALL_DATES)
+    train_data = dp.data_for_arima()[0]
+    test_data = dp.data_for_arima()[1]
 
+    basic_ts = Basic_TS(train_data,test_data)
 
-
-
-
-
-
-
-
-
-
-
-
-
+    basic_ts.arima_fit(8,8)
+    basic_ts.arima_test()
+    basic_ts.garch_fit()
+    basic_ts.garch_test()
 
 
 

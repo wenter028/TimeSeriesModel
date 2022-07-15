@@ -1,6 +1,13 @@
+# This Code is for the concat future to get the major contract
+
 import os
 
 from helper import *
+
+__all__ = ['get_date_list',
+           'choose_open_interest',
+           'get_etf']
+
 
 #get the data I have
 def get_date_list(etf,now_fu,next_fu):
@@ -34,10 +41,11 @@ def choose_open_interest(date, now_fu, next_fu,PATH):
         else:
             next_data = load(next_fu + '/' + date)
             return save_gzip(next_data,(PATH+'/'+date))
-
+#
 def get_etf(date,PATH):
     data = load(ETF_PATH+'/'+date)
     return save_gzip(data, (PATH+'/'+date))
+
 
 if __name__ == '__main__':
     os.makedirs(PROJ_PATH+'/'+'major contract',exist_ok=True)

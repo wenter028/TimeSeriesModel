@@ -1,3 +1,5 @@
+# This Code is for the basic time series model
+# ARIMA and Garch by using python or R(rpy2)
 import numpy as np
 
 from helper import *
@@ -5,13 +7,19 @@ import statsmodels.tsa.stattools as ts
 from statsmodels.stats.diagnostic import acorr_ljungbox
 import statsmodels.api as sm
 from arch import arch_model
-
+import itertools
 import torch
 
 ##R
 from rpy2.robjects import r, pandas2ri,numpy2ri
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
+
+
+__all__ = ['DataProcessing',
+           'Basic_TS_Py',
+           'Basic_TS_R']
+
 
 ##get the data processing from original data
 class DataProcessing:
@@ -185,6 +193,8 @@ class Basic_TS_R:
         self.arima_coefficients = None
         self.garch_coefficients = None
 
+
+
     @staticmethod
     def _get_stationary(data):
         if ts.adfuller(data)[1] <= 0.05:
@@ -249,11 +259,11 @@ class Basic_TS_R:
 
         garch_fitted = self.garch_R.ugarchfit(
             spec=garch_model,
-            data=train_data.values,
+            data=self.train_data.values,
             out_sample=10
         )
 
-        numpy2ri.deactivate()
+
         garch_result = garch_fitted.slots['fit']
         mu = garch_result[9][0]
         resid = garch_result[8]
@@ -289,12 +299,17 @@ class Basic_TS_R:
             q_len = len(q)
 
             mse_list = []
+            mse_true_sign_list = []
+            sign_error_list = []
+
+
             for i in range(len(data.columns)):
                 resid = np.zeros(q_len)
                 test_dat = data.iloc[:, i]
                 pred_list = []
-
-                for j in range(max(p_len, q_len), len(test_dat)):
+                pre_sign_list = []
+                pre_true_sign_index = []
+                for j in range(len(test_dat)):
                     pred = mu
                     for p_index in range(p_len):
                         pred += p[p_index] * (test_dat.iloc[j - p_index - 1] - mu)
@@ -304,17 +319,42 @@ class Basic_TS_R:
                     pred_list.append(pred)
                     resid = np.append(np.delete(resid, 0), data.iloc[j] - pred)
 
-                mse_list.append(self.mse(test_dat.iloc[-len(pred_list):], pred_list))
-        return mse_list
+
+
+                    if self.get_sign(test_dat.iloc[j],pred):
+                        pre_sign_list.append(1)
+                        pre_true_sign_index.append(j)
+
+                mse_list.append(self.mse(test_dat, pred_list))
+                mse_true_sign_list.append(self.mse(test_dat.iloc[pre_true_sign_index],pd.Series(pred_list).iloc[pre_true_sign_index].values))
+                sign_error_list.append(sum(pre_sign_list)/len(test_dat))
+
+            return mse_list,sign_error_list,mse_true_sign_list
 
     def result(self):
-        return self.predict(self.test_data)
+        print('the test result is:')
+        print(f'the mse list is {self.predict(self.test_data)[0]}')
+        print(f'the sum mse is {sum(self.predict(self.test_data)[0])}')
+        print(f'the sign error list is {self.predict(self.test_data)[1]}')
+        print(f'the mean sign error is {np.mean(self.predict(self.test_data)[1])}')
+        print(f'the true sign mse is {self.predict(self.test_data)[2]}')
 
     @staticmethod
     def mse(data_original, data_predict):
         dat = torch.tensor(data_original)
         pre = torch.tensor(data_predict)
         return torch.nn.MSELoss(reduction='sum')(dat, pre)
+
+    @staticmethod
+    def get_sign(dat,pre):
+        if dat > 0:
+            if pre > 0:
+                return 1
+        else:
+            if pre <= 0:
+                return 1
+        return 0
+
 
 
 if __name__ == '__main__':
@@ -328,7 +368,66 @@ if __name__ == '__main__':
     basic_ts_r.arima_test()
     basic_ts_r.garch_fit()
     basic_ts_r.garch_test()
-    print(basic_ts_r.result())
+    basic_ts_r.result()
+
+
+    ##Parallel
+    '''
+    mu = basic_ts_r.garch_coefficients['mu']
+    p = basic_ts_r.garch_coefficients['p']
+    q = basic_ts_r.garch_coefficients['q']
+    p_len = len(p)
+    q_len = len(q)
+
+
+    def mse(data_original, data_predict):
+        dat = torch.tensor(data_original)
+        pre = torch.tensor(data_predict)
+        return torch.nn.MSELoss(reduction='sum')(dat, pre)
+
+
+    def get_sign(dat, pre):
+        if dat > 0:
+            if pre > 0:
+                return 1
+        else:
+            if pre <= 0:
+                return 1
+        return 0
+
+
+    def base_predict(data_columns,data, mu, p, q, p_len, q_len):
+        resid = np.zeros(q_len)
+        test_dat = data[data_columns]
+
+        pred_list = []
+        pre_sign_list = []
+        pre_true_sign_index = []
+
+        for j in range(len(test_dat)):
+            pred = mu
+            for p_index in range(p_len):
+                pred += p[p_index] * (test_dat.iloc[j - p_index - 1] - mu)
+            for q_index in range(q_len):
+                pred += q[q_index] * resid[-q_index - 1]
+
+            pred_list.append(pred)
+            resid = np.append(np.delete(resid, 0), data.iloc[j] - pred)
+
+            if get_sign(test_dat.iloc[j], pred):
+                pre_sign_list.append(1)
+                pre_true_sign_index.append(j)
+
+        return mse(test_dat, pred_list), mse(test_dat.iloc[pre_true_sign_index],
+                                                       pd.Series(pred_list).iloc[pre_true_sign_index].values), sum(
+            pre_sign_list) / len(test_dat)
+
+    result_df = pd.DataFrame(
+            parLapply(basic_ts_r.test_data.columns, base_predict, data=basic_ts_r.test_data, mu=mu, p=p, q=q, p_len=p_len, q_len=q_len),
+            columns=['mse_list', 'sign_error', 'true_sign_mse'])
+
+    print(result_df)
+    '''
 
 
 

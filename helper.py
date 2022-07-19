@@ -8,7 +8,6 @@ import functools
 from dask import compute, delayed
 from datetime import time
 import matplotlib.pyplot as plt
-import mplfinance as mpf
 import numpy as np
 import warnings
 
@@ -121,11 +120,11 @@ class basis_plot:
 
         return self.day_basis
 
-    @staticmethod
+    '''@staticmethod
     def plot_basis_candle(data):
         data.set_index(pd.to_datetime(data.index))
         mpf.plot(data, type='candle')
-
+    '''
 
 
 # get data
@@ -152,38 +151,40 @@ class DataLoader:
         self.data_etf.reset_index(inplace=True)
         self.data_etf['Time'] = self.data_etf.time.apply(lambda x: time(x.hour, x.minute, x.second, future_microsecond))
         self.data_etf['wpr_price'] = ((
-                                                  self.data_etf.BidPrice1 * self.data_etf.AskVolume1 + self.data_etf.AskPrice1 * self.data_etf.BidVolume1) * 1000 / (
-                                                  self.data_etf.BidVolume1 + self.data_etf.AskVolume1)).round(2)
+                                              self.data_etf.BidPrice1 * self.data_etf.AskVolume1 + self.data_etf.AskPrice1 * self.data_etf.BidVolume1) * 1000 / (
+                                              self.data_etf.BidVolume1 + self.data_etf.AskVolume1)).round(2)
 
-    def get_second_data(self, date,second_type='half'):
+    def get_second_data(self, date, second_type='half'):
         try:
             if second_type not in self.second_type:
                 raise ValueError
         except ValueError as e:
-            print("get some error of second_type",e)
+            print("get some error of second_type", e)
 
         self._load(date)
 
-        self.data_etf = self.data_etf[(self.data_etf.Time >= time(9, 30, 0)) & (self.data_etf.Time <= time(15, 0, 0))][
-            ['Time', 'wpr_price']]
-        self.data_future = \
-        self.data_future[(self.data_future.Time >= time(9, 30, 0)) & (self.data_future.Time <= time(15, 0, 0))][
-            ['Time', 'wpr_price']]
+        self.data_etf = self.data_etf[(self.data_etf.Time >= time(9, 30, 0)) & (self.data_etf.Time <= time(15, 0, 0))]
+        self.data_etf.set_axis(self.data_etf.columns.values + '_etf', axis='columns', inplace=True)
+        self.data_etf.rename(columns={'Time_etf': 'Time'}, inplace=True)
 
+        self.data_future.set_axis(self.data_future.columns.values + '_future', axis='columns', inplace=True)
+        self.data_future.rename(columns={'Time_future': 'Time'}, inplace=True)
 
         if second_type == 'half':
-            data = pd.merge(self.data_etf, self.data_future, on='Time', how='outer', suffixes=('_etf', '_future'))
-        elif second_type =='three':
-            data = pd.merge(self.data_etf, self.data_future, on='Time', how='inner', suffixes=('_etf', '_future'))
+            data = pd.merge(self.data_etf, self.data_future, on='Time', how='outer')
+        elif second_type == 'three':
+            data = pd.merge(self.data_etf, self.data_future, on='Time', how='inner')
 
         try:
             data = data.sort_values(by='Time').set_index('Time').fillna(method='ffill').dropna()
         except NameError as e:
-            print('SECOND_TYPE error',e)
+            print('SECOND_TYPE error', e)
 
         data['basis'] = data.wpr_price_future - data.wpr_price_etf
-        data = data.drop(data[(data.index>time(11,30,0))&(data.index<time(13,0,0))].index)
+        data = data.drop(data[(data.index > time(11, 30, 0)) & (data.index < time(13, 0, 0))].index)
 
         return data
+
+
 
 

@@ -3,6 +3,7 @@
 import numpy as np
 
 from helper import *
+from dataprocess import DataProcessing
 import statsmodels.tsa.stattools as ts
 from statsmodels.stats.diagnostic import acorr_ljungbox
 import statsmodels.api as sm
@@ -16,66 +17,11 @@ import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 
 
-__all__ = ['DataProcessing',
-           'Basic_TS_Py',
+__all__ = ['Basic_TS_Py',
            'Basic_TS_R']
 
 
-##get the data processing from original data
-class DataProcessing:
-    def __init__(self, all_dates, time_interval=5, validate=10):
-
-        self.time_interval = time_interval
-        self.validate = validate
-
-        self.all_dates = all_dates
-
-    def _data_processing_for_original(self):
-        train_data = pd.DataFrame(columns=['Time'])
-        test_data = pd.DataFrame(columns=['Time'])
-
-        train_date = self.all_dates[:-int(len(self.all_dates) / self.validate)]
-        test_date = self.all_dates[-int(len(self.all_dates) / self.validate):]
-
-        dl = DataLoader()
-
-        for i in train_date:
-            data = dl.get_second_data(i, 'three')
-            data.reset_index(inplace=True)
-            data.Time = data.Time.apply(lambda x: time(x.hour, x.minute, int(np.floor(x.second / 3)) * 3))
-            data = data.drop_duplicates(subset='Time')
-
-            train_data = pd.merge(train_data, data[['Time', 'basis']], on='Time', how='outer')
-
-        train_data.sort_values(by='Time', inplace=True)
-        train_data.fillna(method='ffill', inplace=True)
-        train_data.set_index('Time', inplace=True)
-
-        for i in test_date:
-            data = dl.get_second_data(i, 'three')
-            data.reset_index(inplace=True)
-            data.Time = data.Time.apply(lambda x: time(x.hour, x.minute, int(np.floor(x.second / 3)) * 3))
-            data = data.drop_duplicates(subset='Time')
-            data.rename(columns={'basis': f'basis_{i[0:10]}'}, inplace=True)
-
-            test_data = pd.merge(test_data, data[['Time', f'basis_{i[0:10]}']], on='Time', how='outer')
-
-        test_data.sort_values(by='Time', inplace=True)
-        test_data.fillna(method='ffill', inplace=True)
-        test_data.set_index('Time', inplace=True)
-        return train_data, test_data
-
-    def data_for_arima(self):
-        train_data, test_data = self._data_processing_for_original()
-
-        train_data['mean_basis'] = train_data.mean(axis=1)
-        train_data = train_data['mean_basis'].diff(5).iloc[np.where(np.arange(len(train_data)) % 5 == 0)].dropna()
-
-        test_data = test_data.diff(5).iloc[np.where(np.arange(len(train_data)) % 5 == 0)].dropna()
-
-        return train_data, test_data
-
-
+warnings.filterwarnings("ignore")
 ##ARIMA and GARCH by using python
 class Basic_TS_Py:
     def __init__(self, train_data, test_data):
@@ -228,6 +174,7 @@ class Basic_TS_R:
 
         self.arima_coefficients = {'p': arima_model[0][:p], 'q': arima_model[0][p:p + q], 'resid': resid}
         print('arima fit done')
+        print(f"arima coeffecient is{self.arima_coefficients['p'],self.arima_coefficients['q']}")
         pandas2ri.deactivate()
 
     def arima_test(self):
@@ -273,6 +220,7 @@ class Basic_TS_R:
 
         pandas2ri.deactivate()
         print('arima garch fit done')
+        print(f"arima garch coeffecient is{self.garch_coefficients['mu'],self.garch_coefficients['p'], self.garch_coefficients['q']}")
 
     def garch_test(self):
         resid = self.garch_coefficients['resid']
@@ -301,15 +249,17 @@ class Basic_TS_R:
             mse_list = []
             mse_true_sign_list = []
             sign_error_list = []
+            print(f'the test data is {data}')
 
 
-            for i in range(len(data.columns)):
+            for i,_ in enumerate(data.columns):
                 resid = np.zeros(q_len)
                 test_dat = data.iloc[:, i]
+
                 pred_list = []
                 pre_sign_list = []
                 pre_true_sign_index = []
-                for j in range(len(test_dat)):
+                for j ,_ in enumerate(test_dat):
                     pred = mu
                     for p_index in range(p_len):
                         pred += p[p_index] * (test_dat.iloc[j - p_index - 1] - mu)
@@ -333,11 +283,12 @@ class Basic_TS_R:
 
     def result(self):
         print('the test result is:')
-        print(f'the mse list is {self.predict(self.test_data)[0]}')
-        print(f'the sum mse is {sum(self.predict(self.test_data)[0])}')
-        print(f'the sign error list is {self.predict(self.test_data)[1]}')
-        print(f'the mean sign error is {np.mean(self.predict(self.test_data)[1])}')
-        print(f'the true sign mse is {self.predict(self.test_data)[2]}')
+        result = self.predict(self.test_data)
+        print(f'the mse list is {result[0]}')
+        print(f'the sum mse is {sum(result[0])}')
+        print(f'the sign error list is {result[1]}')
+        print(f'the mean sign error is {np.mean(result[1])}')
+        print(f'the true sign mse is {result[2]}')
 
     @staticmethod
     def mse(data_original, data_predict):
@@ -404,7 +355,7 @@ if __name__ == '__main__':
         pre_sign_list = []
         pre_true_sign_index = []
 
-        for j in range(len(test_dat)):
+        for j,_ in enumerate(test_dat):
             pred = mu
             for p_index in range(p_len):
                 pred += p[p_index] * (test_dat.iloc[j - p_index - 1] - mu)

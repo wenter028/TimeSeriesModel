@@ -1,4 +1,5 @@
-import datetime
+# This code is a helper for pretreatment
+
 import pandas as pd
 import _pickle as cPickle
 import gzip
@@ -11,11 +12,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import warnings
 
+__author__ = 'Wenter'
 
-
-
-
-
+__all__ = ['parLapply',
+           'load',
+           'load_gzip',
+           'save_gzip',
+           'DataReader',
+           'ALL_DATES'
+           ]
 warnings.filterwarnings("ignore")
 
 CORE_NUM = int(os.environ['NUMBER_OF_PROCESSORS'])
@@ -32,14 +37,20 @@ FUTURE_DATA_PATH = 'D:/Code/Work/GTJA/spread basis/major contract'
 
 ALL_DATES = os.listdir(ETF_DATA_PATH)
 
-#parell
+#parallel
 def parLapply(iterable, func, *args, **kwargs):
+    """
+    parallel for any func
+
+    :param iterable : an iterable params which can be iter to parllel
+    :param func: function
+    :param args: parameters list
+    :param kwargs: parameters dict
+    """
     with dask.config.set(scheduler='processes', num_workers=CORE_NUM):
         f_par = functools.partial(func, *args, **kwargs)
         result = compute([delayed(f_par)(item) for item in iterable])[0]
         return result
-
-
 
 # load pickle data
 def load(path):
@@ -62,8 +73,6 @@ def save_gzip(data, path):
 
 
 # plot the basis
-
-
 class basis_plot:
     def __init__(self):
         self._data_etf = None
@@ -128,14 +137,25 @@ class basis_plot:
 
 
 # get data
-class DataLoader:
+class DataReader:
+    """
+    Data Reader for the original data
+    """
     def __init__(self):
         self.data_etf = None
         self.data_future = None
 
+        #data second interval
         self.second_type = ['half', 'three']
 
     def _load(self, date):
+        """
+        :func:get the data from specific date
+              treat the future and etf data on open time, use the same time index for future and etf
+              get the wpr_price instead of middle price
+        :param date: specific date want to choose
+        """
+
         self.data_etf = load_gzip(ETF_DATA_PATH + '/' + date)
         self.data_future = load_gzip(FUTURE_DATA_PATH + '/' + date)
 
@@ -155,6 +175,13 @@ class DataLoader:
                                               self.data_etf.BidVolume1 + self.data_etf.AskVolume1)).round(2)
 
     def get_second_data(self, date, second_type='half'):
+        """
+        :func:because the data of future is half second interval and the data of etf is three second interval
+              choose the time interval to get the concat dataset
+        :param date:the specific date
+        :param second_type: half or three
+        """
+
         try:
             if second_type not in self.second_type:
                 raise ValueError

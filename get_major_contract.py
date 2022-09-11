@@ -1,8 +1,9 @@
 # This Code is for the concat future to get the major contract
 
 import os
-
 from helper import *
+
+__author__ = 'Wenter'
 
 __all__ = ['get_date_list',
            'choose_open_interest',
@@ -10,7 +11,15 @@ __all__ = ['get_date_list',
 
 
 #get the data I have
-def get_date_list(etf,now_fu,next_fu):
+def get_date_list(etf: str,
+                  now_fu: str,
+                  next_fu: str):
+    """
+    :func: clear nan date
+    :param etf: etf
+    :param now_fu: this month future
+    :param next_fu: next month future
+    """
     etf_list = os.listdir(etf)
     now_future_list = os.listdir(now_fu)
     next_future_list = os.listdir(next_fu)
@@ -18,12 +27,18 @@ def get_date_list(etf,now_fu,next_fu):
     return set(etf_list).intersection(set(now_future_list).union(next_future_list))
 
 #get major contract
-def choose_open_interest(date, now_fu, next_fu,PATH):
+def choose_open_interest(date: str,
+                         now_fu: str,
+                         next_fu: str,
+                         PATH: str):
 
-    '''
-    now_fu:当月
-    next_fu:下月
-    '''
+    """
+    :func: choose major contract
+    :param date: date
+    :param now_fu: this month future
+    :param next_fu: next month future
+    :param PATH: work path
+    """
 
     if date in os.listdir(now_fu) and date in os.listdir(next_fu):
         now_data = load(now_fu + '/' + date)
@@ -41,8 +56,10 @@ def choose_open_interest(date, now_fu, next_fu,PATH):
         else:
             next_data = load(next_fu + '/' + date)
             return save_gzip(next_data,(PATH+'/'+date))
-#
-def get_etf(date,PATH):
+
+#get etf list
+def get_etf(date: str,
+            PATH: str):
     data = load(ETF_PATH+'/'+date)
     return save_gzip(data, (PATH+'/'+date))
 

@@ -8,7 +8,7 @@ import torch
 
 __author__ = 'Wenter'
 
-__all__ = ['BasisEnv',]
+__all__ =  ['BasisEnv',]
 
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
